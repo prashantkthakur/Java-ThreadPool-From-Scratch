@@ -1,0 +1,169 @@
+ThreadPool
+-----------
+
+Table of Content:
+-----------------
+
+Section I   : Source Code Information
+Section II  : Test Results
+
+-------------------
+
+Section I: Source Code Information
+
+-------------------
+Root Package: cs455.scaling
+
+Package: node
+
+1) Server :
+    This is the main class for server. The server uses Reenterant lock instead of synchronized method. This was
+    done so that the is less contention between threads. The Server listens for the incoming connection and registers
+    the keys. Based on the key (if readable or writable) the corresponding method is called. Read is handled by
+    "readHandler" method which reads the buffer, creates a Read task and add it to the queue for the worker to
+    execute. The read task during execution computes the hash and attach it to the key and make the key writable.
+     The "writeHandler" handles the write operations by retrieving the attachment from the key and if the attachment
+     is a valid hashCode then it is sent to the Client using channel created using key.
+
+2) Client :
+    The Client is the main class for client. This class also uses ReentrantLock for handling thread data access.
+    The client creates an instance of SendPayload which is responsible to sending data after the connection has
+    been established with the server. Similar to the server, "readHandler" handles the read of hashCode sent by
+    the server. It also checks if the hashCode matches its stored unacknowledged hashCode and remove it from the
+    list.
+
+Package: threadPool
+
+1) PoolManager :
+    This class creates the worker of pool size (argument passed to server). Based on the batch size and the batch
+    time the pool manager allocates the work to the workers waiting by notifying them.
+
+2) Worker :
+    The worker class is simple as it executes the task that was added to it by the pool manager and after execution
+    add itself to worker list so that pool manager can allocate the next task to it.
+
+package: utils
+
+1) ClientStat :
+    This class is used by the clients to display the data on client side.
+
+2) SendPayload :
+    This class is used by the client to send the data (by constructing 8KB of random data). It also adds the hash
+    value of the data sent to the server.
+
+3) ServerStat :
+    This class is used to display the summary for server.
+
+4) Task :
+    This is the interface which TaskReader and WriteTask implements. These classes are used by server.
+
+5) TaskReader :
+    Class handles the read operation on the server side.
+
+6) WriteTask :
+    Class handles the write operation on the server side.
+
+
+-------------------
+
+Section II  : Test Results
+
+-------------------
+
+Note: The server starts and displays the information immediately and the information is refreshed every 20 seconds
+When the client is ran on other machine, the connection is established and the active client has 100.
+
+There might be a case when the client is not registered properly and the display command is executed. For instance,
+if only 70 out of 100 clients were registered, the active clients can temporarily be 70 but it should update to
+correct value after 20 seconds.
+
+Also when the connection is cleaned, there might be a case where the messages sent during the time ( clients were
+disconnected) so the server throughput could be more than 0 but it would again show updated information after 20
+seconds.
+
+If the clients are started again, we would see the information of updated clients.
+
+We might see some other information like "IOException on server; Client disconnected during read operation." when
+the client disconnects while the worker is reading the data.
+
+Server Side: Command executed
+...............................................................
+[pthakur@acorn main]$ java Server 5555 10 20 0.5
+...............................................................
+
+Started Server acorn to listen on port 5555
+[18:28:25] Server Throughput: 0 messages/s, Active Client Connections: 0, Mean Per-Client Throughput: 0.00 messages/s, Std. Dev. Of Per-client Throughput: 0.00 messages/s
+[18:28:45] Server Throughput: 0 messages/s, Active Client Connections: 0, Mean Per-Client Throughput: 0.00 messages/s, Std. Dev. Of Per-client Throughput: 0.00 messages/s
+[18:29:05] Server Throughput: 0 messages/s, Active Client Connections: 0, Mean Per-Client Throughput: 0.00 messages/s, Std. Dev. Of Per-client Throughput: 0.00 messages/s
+[18:29:25] Server Throughput: 8429 messages/s, Active Client Connections: 100, Mean Per-Client Throughput: 75.500
+messages/s, Std. Dev. Of Per-client Throughput: 0.990 messages/s
+IOException on server; Client disconnected during read operation.
+IOException on server; Client disconnected during read operation.
+[18:29:45] Server Throughput: 5637 messages/s, Active Client Connections: 0, Mean Per-Client Throughput: 0.000
+messages/s, Std. Dev. Of Per-client Throughput: 0.000 messages/s
+[18:30:05] Server Throughput: 0 messages/s, Active Client Connections: 0, Mean Per-Client Throughput: 0.000 messages/s,
+Std. Dev. Of Per-client Throughput: 0.000 messages/s
+[18:30:25] Server Throughput: 7161 messages/s, Active Client Connections: 100, Mean Per-Client Throughput: 5.500
+messages/s, Std. Dev. Of Per-client Throughput: 9.010 messages/s
+
+Client Side: Command executed
+...........................................................................................
+[pthakur@bananas main]$ for i in {1..100}; do java Client acorn 5555 5 &  done
+[pthakur@bananas main]$ pkill java
+[pthakur@bananas main]$ for i in {1..100}; do java Client acorn 5555 5 &  done
+...........................................................................................
+
+Note: All 100 clients are running on the same server so all clients' summary displayed here.
+
+Some of the sample stat for client:
+
+[18:31:34] Total Sent Count: 99, Total Received Count: 103
+[18:31:34] Total Sent Count: 100, Total Received Count: 96
+[18:31:34] Total Sent Count: 101, Total Received Count: 106
+[18:31:34] Total Sent Count: 100, Total Received Count: 104
+[18:31:34] Total Sent Count: 99, Total Received Count: 92
+[18:31:34] Total Sent Count: 99, Total Received Count: 100
+[18:31:34] Total Sent Count: 100, Total Received Count: 98
+[18:31:34] Total Sent Count: 100, Total Received Count: 101
+[18:31:34] Total Sent Count: 100, Total Received Count: 100
+[18:31:34] Total Sent Count: 99, Total Received Count: 90
+[18:31:34] Total Sent Count: 100, Total Received Count: 116
+[18:31:34] Total Sent Count: 101, Total Received Count: 116
+[18:31:34] Total Sent Count: 100, Total Received Count: 114
+[18:31:34] Total Sent Count: 99, Total Received Count: 112
+[18:31:34] Total Sent Count: 99, Total Received Count: 103
+[18:31:34] Total Sent Count: 100, Total Received Count: 108
+[18:31:34] Total Sent Count: 100, Total Received Count: 111
+[18:31:34] Total Sent Count: 100, Total Received Count: 107
+[18:31:34] Total Sent Count: 99, Total Received Count: 125
+[18:31:34] Total Sent Count: 100, Total Received Count: 110
+[18:31:34] Total Sent Count: 100, Total Received Count: 101
+[18:31:34] Total Sent Count: 100, Total Received Count: 111
+[18:31:34] Total Sent Count: 100, Total Received Count: 124
+[18:31:34] Total Sent Count: 100, Total Received Count: 104
+[18:31:34] Total Sent Count: 100, Total Received Count: 112
+[18:31:34] Total Sent Count: 100, Total Received Count: 103
+[18:31:34] Total Sent Count: 100, Total Received Count: 113
+[18:31:34] Total Sent Count: 100, Total Received Count: 104
+[18:31:34] Total Sent Count: 100, Total Received Count: 107
+[18:31:34] Total Sent Count: 100, Total Received Count: 103
+
+For single client running.
+
+~/SP19/distributed-cs455/threadPool-PA2/out/production/classes (master)$ java cs455/scaling/nodes/Client localhost 5555 5
+Started Client on pkt-local
+[12:40:52] Total Sent Count: 1, Total Received Count: 0
+[12:41:12] Total Sent Count: 99, Total Received Count: 86
+[12:41:32] Total Sent Count: 100, Total Received Count: 98
+
+
+The Received count sometime gets higher than sent as the same lock is acquired for reading the data for display
+or to update the packet received. It is likely that the lock is acquired by the method to increment the packet
+received and the time the display gets the lock, the value is already incremented to a value higher than it
+should have been. However, if we increment the batchsize or batchtime to buffer the items on server side the value
+seem to be closer to the sent count.
+
+This number also seen differently when multiple clients are present, it might have different behavior with higher
+received values as any task (from any client) can be served mo
+
+This has been considered as normal behavior for this program. Some discretion requested. (Thanks) :)
